@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { Navbar } from "@/components/Navbar";
@@ -33,7 +33,7 @@ function defaultClose() {
   return d.toISOString().slice(0, 16);
 }
 
-export default function CreateProblemPage() {
+function CreateProblemForm() {
   const { user, hydrated, createProblem } = useApp();
   const router = useRouter();
   const params = useSearchParams();
@@ -267,5 +267,13 @@ export default function CreateProblemPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function CreateProblemPage() {
+  return (
+    <Suspense>
+      <CreateProblemForm />
+    </Suspense>
   );
 }
