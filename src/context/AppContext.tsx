@@ -63,8 +63,8 @@ const USERS: (User & { password: string })[] = [
   { id: "pranav-teacher",  name: "Pranav", username: "pranav", password: "pranavasateacher", role: "teacher", points: 0, streak: 0 },
 ];
 
-const BIN_ID  = process.env.NEXT_PUBLIC_JSONBIN_BIN_ID!;
-const API_KEY = process.env.NEXT_PUBLIC_JSONBIN_API_KEY!;
+const BIN_ID  = "6a9d5b96da38895dfe3fa702";
+const API_KEY = "$2a$10$eFBijFWgpHyG5oXSaR.DTuF/tgP091OflF0VvtqlhrQzVSHSFyMai";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const HEADERS = { "Content-Type": "application/json", "X-Master-Key": API_KEY };
 

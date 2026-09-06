@@ -54,6 +54,12 @@ export default function StudentPage() {
   const solved = mySubmissions.filter(s => s.isCorrect).length;
   const accuracy = mySubmissions.length ? Math.round(solved / mySubmissions.length * 100) : null;
 
+  if (!hydrated) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-400 text-sm animate-pulse">Loading…</p>
+    </div>
+  );
+
   if (!user) return null;
 
   return (

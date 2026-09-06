@@ -67,6 +67,12 @@ export default function TeacherPage() {
     return Object.fromEntries(Object.entries(subsByProblem).filter(([id]) => myIds.has(id)));
   }, [subsByProblem, myProblems]);
 
+  if (!hydrated) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-400 text-sm animate-pulse">Loading dashboard…</p>
+    </div>
+  );
+
   if (!user) return null;
 
   return (
