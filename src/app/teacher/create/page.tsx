@@ -85,17 +85,23 @@ function CreateProblemForm() {
     const errs = validate();
     if (errs.length) { setErrors(errs); return; }
     setSaving(true);
-    await new Promise(r => setTimeout(r, 300));
-    createProblem({
-      title: title.trim(), body: body.trim(), subject, difficulty,
-      hints: hints.map(h => h.trim()).filter(Boolean),
-      options,
-      answer: answer.trim(),
-      solution: solution.trim(),
-      publishAt: new Date(publishAt).toISOString(),
-      closeAt: new Date(closeAt).toISOString(),
-    });
-    router.push("/teacher");
+    try {
+      await new Promise(r => setTimeout(r, 300));
+      createProblem({
+        title: title.trim(), body: body.trim(), subject, difficulty,
+        hints: hints.map(h => h.trim()).filter(Boolean),
+        options,
+        answer: answer.trim(),
+        solution: solution.trim(),
+        publishAt: new Date(publishAt).toISOString(),
+        closeAt: new Date(closeAt).toISOString(),
+      });
+      window.location.href = "/teacher";
+    } catch (err) {
+      console.error("Failed to publish problem:", err);
+      setErrors(["Something went wrong. Please try again."]);
+      setSaving(false);
+    }
   }
 
   const inputCls = "w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
