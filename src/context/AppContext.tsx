@@ -114,12 +114,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createProblem = useCallback((p: Omit<Problem, "id" | "createdAt" | "createdBy" | "createdByName">) => {
+    const currentUser: User = JSON.parse(localStorage.getItem("potd_user")!);
     const newProblem: Problem = {
       ...p,
       id: `p-${Date.now()}`,
       createdAt: new Date().toISOString(),
-      createdBy: user!.id,
-      createdByName: user!.name,
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
     };
     setProblems(prev => {
       const updated = [newProblem, ...prev];
