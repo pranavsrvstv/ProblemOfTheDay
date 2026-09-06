@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  password    String
+  role        Role         @default(STUDENT)
+  batch       String?
+  points      Int          @default(0)
+  streak      Int          @default(0)
+  lastSolved  DateTime?
+  createdAt   DateTime     @default(now())
+  submissions Submission[]
+}
+
+model Problem {
+  id           String       @id @default(cuid())
+  title        String
+  body         String       // supports markdown + LaTeX
+  subject      Subject
+  difficulty   Difficulty
+  hint1        String?
+  hint2        String?
+  hint3        String?
+  solution     String       // shown after deadline
+  publishAt    DateTime
+  closeAt      DateTime
+  createdAt    DateTime     @default(now())
+  submissions  Submission[]
+}
+
+model Submission {
+  id          String    @id @default(cuid())
+  userId      String
+  problemId   String
+  answer      String
+  isCorrect   Boolean   @default(false)
+  hintsUsed   Int       @default(0)
+  pointsEarned Int      @default(0)
+  submittedAt DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+  problem     Problem   @relation(fields: [problemId], references: [id])
+
+  @@unique([userId, problemId])
+}
+
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+enum Subject {
+  MATH
+  SCIENCE
+  ENGLISH
+  HISTORY
+  GEOGRAPHY
+  COMPUTER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
