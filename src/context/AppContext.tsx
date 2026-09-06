@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 
 export type Subject = "Math" | "Science" | "English" | "History" | "Computer";
 export type Difficulty = "Easy" | "Medium" | "Hard";
@@ -21,14 +21,14 @@ export interface Problem {
   subject: Subject;
   difficulty: Difficulty;
   hints: string[];
-  options: [string, string, string, string]; // A, B, C, D — empty string = no option
+  options: [string, string, string, string];
   answer: string;
   solution: string;
   publishAt: string;
   closeAt: string;
   createdAt: string;
-  createdBy: string;   // user id of the teacher who created it
-  createdByName: string; // display name
+  createdBy: string;
+  createdByName: string;
 }
 
 export interface Submission {
@@ -49,20 +49,34 @@ interface AppContextType {
   submissions: Submission[];
   login: (username: string, password: string) => boolean;
   logout: () => void;
-  createProblem: (p: Omit<Problem, "id" | "createdAt" | "createdBy" | "createdByName">) => void;
-  deleteProblem: (id: string) => void;
+  createProblem: (p: Omit<Problem, "id" | "createdAt" | "createdBy" | "createdByName">) => Promise<void>;
+  deleteProblem: (id: string) => Promise<void>;
   submitAnswer: (problemId: string, answer: string, hintsUsed: number) => { isCorrect: boolean; pointsEarned: number; solution: string };
 }
 
 const AppContext = createContext<AppContextType>(null!);
 
-// ── 4 hardcoded users, dual-role by password ───────────────────────────────
 const USERS: (User & { password: string })[] = [
-  { id: "chahat-student", name: "Chahat", username: "chahat", password: "chahatasstudent", role: "student", points: 0, streak: 0 },
-  { id: "chahat-teacher", name: "Chahat", username: "chahat", password: "chahatasteacher", role: "teacher", points: 0, streak: 0 },
-  { id: "pranav-student", name: "Pranav", username: "pranav", password: "pranavasastudent", role: "student", points: 0, streak: 0 },
-  { id: "pranav-teacher", name: "Pranav", username: "pranav", password: "pranavasateacher", role: "teacher", points: 0, streak: 0 },
+  { id: "chahat-student",  name: "Chahat", username: "chahat", password: "chahatasstudent",  role: "student", points: 0, streak: 0 },
+  { id: "chahat-teacher",  name: "Chahat", username: "chahat", password: "chahatasteacher",  role: "teacher", points: 0, streak: 0 },
+  { id: "pranav-student",  name: "Pranav", username: "pranav", password: "pranavasastudent", role: "student", points: 0, streak: 0 },
+  { id: "pranav-teacher",  name: "Pranav", username: "pranav", password: "pranavasateacher", role: "teacher", points: 0, streak: 0 },
 ];
+
+const BIN_ID  = process.env.NEXT_PUBLIC_JSONBIN_BIN_ID!;
+const API_KEY = process.env.NEXT_PUBLIC_JSONBIN_API_KEY!;
+const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const HEADERS = { "Content-Type": "application/json", "X-Master-Key": API_KEY };
+
+async function fetchBin(): Promise<{ problems: Problem[]; submissions: Submission[] }> {
+  const res = await fetch(`${BIN_URL}/latest`, { headers: HEADERS });
+  const json = await res.json();
+  return json.record ?? { problems: [], submissions: [] };
+}
+
+async function updateBin(data: { problems: Problem[]; submissions: Submission[] }) {
+  await fetch(BIN_URL, { method: "PUT", headers: HEADERS, body: JSON.stringify(data) });
+}
 
 function normalize(s: string) {
   return s.toLowerCase().replace(/\s*,\s*/g, ",").trim();
@@ -83,20 +97,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const binDataRef = useRef<{ problems: Problem[]; submissions: Submission[] }>({ problems: [], submissions: [] });
 
   useEffect(() => {
     const savedUser = localStorage.getItem("potd_user");
     if (savedUser) setUser(JSON.parse(savedUser));
 
-    const savedProblems = localStorage.getItem("potd_problems");
-    const raw: Problem[] = savedProblems ? JSON.parse(savedProblems) : [];
-    const pruned = pruneOldProblems(raw);
-    setProblems(pruned);
-    localStorage.setItem("potd_problems", JSON.stringify(pruned));
-
-    const savedSubs = localStorage.getItem("potd_submissions");
-    if (savedSubs) setSubmissions(JSON.parse(savedSubs));
-    setHydrated(true);
+    fetchBin().then(data => {
+      const pruned = pruneOldProblems(data.problems ?? []);
+      binDataRef.current = { problems: pruned, submissions: data.submissions ?? [] };
+      setProblems(pruned);
+      setSubmissions(data.submissions ?? []);
+      // if problems were pruned, persist back
+      if (pruned.length !== (data.problems ?? []).length) {
+        updateBin({ problems: pruned, submissions: data.submissions ?? [] });
+      }
+    }).catch(() => {
+      // fallback to localStorage if JSONBin unreachable
+      const p = localStorage.getItem("potd_problems");
+      const s = localStorage.getItem("potd_submissions");
+      if (p) setProblems(pruneOldProblems(JSON.parse(p)));
+      if (s) setSubmissions(JSON.parse(s));
+    }).finally(() => setHydrated(true));
   }, []);
 
   const login = useCallback((username: string, password: string): boolean => {
@@ -113,7 +135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("potd_user");
   }, []);
 
-  const createProblem = useCallback((p: Omit<Problem, "id" | "createdAt" | "createdBy" | "createdByName">) => {
+  const createProblem = useCallback(async (p: Omit<Problem, "id" | "createdAt" | "createdBy" | "createdByName">) => {
     const currentUser: User = JSON.parse(localStorage.getItem("potd_user")!);
     const newProblem: Problem = {
       ...p,
@@ -122,42 +144,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdBy: currentUser.id,
       createdByName: currentUser.name,
     };
-    setProblems(prev => {
-      const updated = [newProblem, ...prev];
-      localStorage.setItem("potd_problems", JSON.stringify(updated));
-      return updated;
-    });
+    const updated = { ...binDataRef.current, problems: [newProblem, ...binDataRef.current.problems] };
+    binDataRef.current = updated;
+    setProblems(updated.problems);
+    await updateBin(updated);
   }, []);
 
-  const deleteProblem = useCallback((id: string) => {
-    setProblems(prev => {
-      const updated = prev.filter(p => p.id !== id);
-      localStorage.setItem("potd_problems", JSON.stringify(updated));
-      return updated;
-    });
+  const deleteProblem = useCallback(async (id: string) => {
+    const updated = { ...binDataRef.current, problems: binDataRef.current.problems.filter(p => p.id !== id) };
+    binDataRef.current = updated;
+    setProblems(updated.problems);
+    await updateBin(updated);
   }, []);
 
   const submitAnswer = useCallback((problemId: string, answer: string, hintsUsed: number) => {
-    const problem = problems.find(p => p.id === problemId)!;
+    const problem = binDataRef.current.problems.find(p => p.id === problemId)!;
+    const currentUser: User = JSON.parse(localStorage.getItem("potd_user")!);
     const isCorrect = normalize(answer) === normalize(problem.answer);
     const pointsEarned = isCorrect ? pointsFor(problem.difficulty, hintsUsed) : 0;
     const sub: Submission = {
-      id: `s-${Date.now()}`, userId: user!.id, problemId, answer,
+      id: `s-${Date.now()}`, userId: currentUser.id, problemId, answer,
       isCorrect, hintsUsed, pointsEarned,
       submittedAt: new Date().toISOString(),
     };
-    setSubmissions(prev => {
-      const updated = [...prev, sub];
-      localStorage.setItem("potd_submissions", JSON.stringify(updated));
-      return updated;
-    });
-    if (isCorrect && user) {
-      const updatedUser = { ...user, points: user.points + pointsEarned };
+    const updated = { ...binDataRef.current, submissions: [...binDataRef.current.submissions, sub] };
+    binDataRef.current = updated;
+    setSubmissions(updated.submissions);
+    updateBin(updated);
+    if (isCorrect) {
+      const updatedUser = { ...currentUser, points: currentUser.points + pointsEarned };
       setUser(updatedUser);
       localStorage.setItem("potd_user", JSON.stringify(updatedUser));
     }
     return { isCorrect, pointsEarned, solution: problem.solution };
-  }, [problems, user]);
+  }, []);
 
   return (
     <AppContext.Provider value={{ user, hydrated, problems, submissions, login, logout, createProblem, deleteProblem, submitAnswer }}>

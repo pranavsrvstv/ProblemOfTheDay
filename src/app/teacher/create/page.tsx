@@ -86,8 +86,7 @@ function CreateProblemForm() {
     if (errs.length) { setErrors(errs); return; }
     setSaving(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      createProblem({
+      await createProblem({
         title: title.trim(), body: body.trim(), subject, difficulty,
         hints: hints.map(h => h.trim()).filter(Boolean),
         options,
